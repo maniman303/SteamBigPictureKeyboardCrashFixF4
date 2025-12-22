@@ -1,6 +1,8 @@
 #include "SteamWorkaround.h"
 #include "utils/SteamUtils.h"
 
+bool isLooksMenuOpen = false;
+bool isConsoleOpen = false;
 bool isEnabled = false;
 
 ISteamUtils* steamUtils = NULL;
@@ -17,13 +19,13 @@ SteamAPI_RunCallbacks fpSteamAPI_RunCallbacks = NULL;
 
 void DetourSteamAPI_RunCallbacks()
 {
-    if (isEnabled)
+    if (!isEnabled && (isLooksMenuOpen || isConsoleOpen))
     {
-        fpSteamAPI_RunCallbacks();
+        releaseMemory();
         return;
     }
 
-    releaseMemory();
+    fpSteamAPI_RunCallbacks();
 }
 
 using ShowFloatingGamepadTextInputFn = bool(__thiscall*)(ISteamUtils* thisptr, EFloatingGamepadTextInputMode eKeyboardMode, int nTextFieldXPosition, int nTextFieldYPosition, int nTextFieldWidth, int nTextFieldHeight);
@@ -171,4 +173,24 @@ void SteamWorkaround::Hook()
     }
 
     REX::INFO("MinHook initialization finished.");
+}
+
+void SteamWorkaround::SetMenu(std::string menu, bool isOpened)
+{
+    if (menu != "LooksMenu" && menu != "Console")
+    {
+        return;
+    }
+
+    if (menu == "LooksMenu")
+    {
+        isLooksMenuOpen = isLooksMenuOpen || isOpened;
+    }
+
+    if (menu == "Console")
+    {
+        isConsoleOpen = isConsoleOpen || isOpened;
+    }
+
+    // REX::INFO(std::format("Event [{0}] is opening: {1}.", menu, isOpened));
 }
