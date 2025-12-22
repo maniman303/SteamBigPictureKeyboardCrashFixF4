@@ -1,7 +1,11 @@
 #include "SteamWorkaround.h"
+#include "utils/SteamUtils.h"
 
-bool isLooksMenuOpen = false;
-bool isConsoleOpen = false;
+bool isEnabled = false;
+
+ISteamUtils* steamUtils = NULL;
+
+typedef ISteamUtils*(__stdcall* GetISteamUtils)(void);
 
 typedef void(WINAPI* SteamAPI_ReleaseCurrentThreadMemory)();
 
@@ -13,14 +17,95 @@ SteamAPI_RunCallbacks fpSteamAPI_RunCallbacks = NULL;
 
 void DetourSteamAPI_RunCallbacks()
 {
-    if (isLooksMenuOpen || isConsoleOpen)
+    if (isEnabled)
     {
-        releaseMemory();
-
+        fpSteamAPI_RunCallbacks();
         return;
     }
 
-    fpSteamAPI_RunCallbacks();
+    releaseMemory();
+}
+
+using ShowFloatingGamepadTextInputFn = bool(__thiscall*)(ISteamUtils* thisptr, EFloatingGamepadTextInputMode eKeyboardMode, int nTextFieldXPosition, int nTextFieldYPosition, int nTextFieldWidth, int nTextFieldHeight);
+
+ShowFloatingGamepadTextInputFn originalShowFloatingGamepadTextInput;
+
+bool DetourShowFloatingGamepadTextInput(ISteamUtils* thisptr, EFloatingGamepadTextInputMode eKeyboardMode, int nTextFieldXPosition, int nTextFieldYPosition, int nTextFieldWidth, int nTextFieldHeight)
+{
+    REX::INFO("Showing floating gamepad text input.");
+
+    isEnabled = true;
+
+    return originalShowFloatingGamepadTextInput(thisptr, eKeyboardMode, nTextFieldXPosition, nTextFieldYPosition, nTextFieldWidth, nTextFieldHeight);
+}
+
+void HookShowFloatingGamepadTextInput(ISteamUtils* utils)
+{
+    void** vtable = *(void***)utils;
+
+    int index = 35;
+
+    DWORD oldProtect;
+    VirtualProtect(
+        &vtable[index],
+        sizeof(void*),
+        PAGE_EXECUTE_READWRITE,
+        &oldProtect
+    );
+
+    originalShowFloatingGamepadTextInput = (ShowFloatingGamepadTextInputFn)vtable[index];
+
+    vtable[index] = (void*)&DetourShowFloatingGamepadTextInput;
+
+    VirtualProtect(
+        &vtable[index],
+        sizeof(void*),
+        oldProtect,
+        &oldProtect
+    );
+
+    REX::INFO("Hooked ShowFloatingGamepadTextInput.");
+}
+
+using ShowGamepadTextInputFn = bool(__thiscall*)(ISteamUtils* thisptr, EGamepadTextInputMode eInputMode, EGamepadTextInputLineMode eLineInputMode, const char *pchDescription, uint32_t unCharMax, const char *pchExistingText);
+
+ShowGamepadTextInputFn originalShowGamepadTextInput;
+
+bool DetourShowGamepadTextInput(ISteamUtils* thisptr, EGamepadTextInputMode eInputMode, EGamepadTextInputLineMode eLineInputMode, const char *pchDescription, uint32_t unCharMax, const char *pchExistingText)
+{
+    REX::INFO("Showing gamepad text input.");
+
+    isEnabled = true;
+
+    return originalShowGamepadTextInput(thisptr, eInputMode, eLineInputMode, pchDescription, unCharMax, pchExistingText);
+}
+
+void HookShowGamepadTextInput(ISteamUtils* utils)
+{
+    void** vtable = *(void***)utils;
+
+    int index = 20;
+
+    DWORD oldProtect;
+    VirtualProtect(
+        &vtable[index],
+        sizeof(void*),
+        PAGE_EXECUTE_READWRITE,
+        &oldProtect
+    );
+
+    originalShowGamepadTextInput = (ShowGamepadTextInputFn)vtable[index];
+
+    vtable[index] = (void*)&DetourShowGamepadTextInput;
+
+    VirtualProtect(
+        &vtable[index],
+        sizeof(void*),
+        oldProtect,
+        &oldProtect
+    );
+
+    REX::INFO("Hooked ShowGamepadTextInput.");
 }
 
 void SteamWorkaround::Hook()
@@ -46,6 +131,26 @@ void SteamWorkaround::Hook()
         return;
     }
 
+    auto steamUtilsConstructor = (GetISteamUtils)GetProcAddress(handle, "SteamAPI_SteamUtils_v010");
+
+    if (steamUtilsConstructor == NULL)
+    {
+        REX::INFO("GetISteamUtils is NULL.");
+        return;
+    }
+
+    steamUtils = steamUtilsConstructor();
+
+    if (steamUtils == NULL)
+    {
+        REX::INFO("SteamUtils not found.");
+        return;
+    }
+
+    HookShowFloatingGamepadTextInput(steamUtils);
+
+    HookShowGamepadTextInput(steamUtils);
+
     if (MH_Initialize() != MH_OK)
     {
         REX::INFO("Could not initialize MinHook.");
@@ -66,24 +171,4 @@ void SteamWorkaround::Hook()
     }
 
     REX::INFO("MinHook initialization finished.");
-}
-
-void SteamWorkaround::SetMenu(std::string menu, bool isOpened)
-{
-    if (menu != "LooksMenu" && menu != "Console")
-    {
-        return;
-    }
-
-    if (menu == "LooksMenu")
-    {
-        isLooksMenuOpen = isOpened;
-    }
-
-    if (menu == "Console")
-    {
-        isConsoleOpen = isOpened;
-    }
-
-    REX::INFO(std::format("Event [{0}] is opening: {1}.", menu, isOpened));
 }
