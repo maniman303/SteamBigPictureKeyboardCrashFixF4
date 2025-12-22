@@ -1,4 +1,5 @@
 #include "SteamWorkaround.h"
+#include "MenuHandler.h"
 
 bool InitModCore(const F4SE::QueryInterface* a_f4se)
 {
@@ -24,6 +25,8 @@ void OnMessage(F4SE::MessagingInterface::Message* message)
 	if (message->type == F4SE::MessagingInterface::kGameDataReady)
 	{
 		SteamWorkaround::Hook();
+
+		MenuHandler::Register();
 
 		REX::INFO("Finished initialization.");
 	}
