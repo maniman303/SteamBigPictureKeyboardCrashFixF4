@@ -12,10 +12,19 @@ git clone --recurse-submodules https://github.com/libxse/commonlibf4-template
 cd commonlibf4-template
 ```
 
+## VS Code Setup
+
+Run
+```bat
+xmake project -k compile_commands -y
+```
+
+Then move `compile_commands.json` to `.vscode` folder.
+
 ### Build
 To build the project, run the following command:
 ```bat
-xmake build
+xmake build -y
 ```
 
 > ***Note:*** *This will generate a `build/windows/` directory in the **project's root directory** with the build output.*
