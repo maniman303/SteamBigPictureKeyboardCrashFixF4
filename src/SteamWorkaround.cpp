@@ -2,7 +2,7 @@
 #include "utils/SteamUtils.h"
 
 bool isLooksMenuOpen = false;
-bool isConsoleOpen = false;
+bool isMainMenuOpen = true;
 bool isEnabled = false;
 
 ISteamUtils* steamUtils = NULL;
@@ -19,7 +19,7 @@ SteamAPI_RunCallbacks fpSteamAPI_RunCallbacks = NULL;
 
 void DetourSteamAPI_RunCallbacks()
 {
-    if (!isEnabled && (isLooksMenuOpen || isConsoleOpen))
+    if (!isEnabled && (isLooksMenuOpen || !isMainMenuOpen))
     {
         releaseMemory();
         return;
@@ -177,7 +177,9 @@ void SteamWorkaround::Hook()
 
 void SteamWorkaround::SetMenu(std::string menu, bool isOpened)
 {
-    if (menu != "LooksMenu" && menu != "Console")
+    REX::INFO(std::format("Event [{0}] is opening: {1}.", menu, isOpened));
+
+    if (menu != "LooksMenu" && menu != "MainMenu")
     {
         return;
     }
@@ -187,10 +189,8 @@ void SteamWorkaround::SetMenu(std::string menu, bool isOpened)
         isLooksMenuOpen = isLooksMenuOpen || isOpened;
     }
 
-    if (menu == "Console")
+    if (menu == "CursorMenu")
     {
-        isConsoleOpen = isConsoleOpen || isOpened;
+        isMainMenuOpen = isMainMenuOpen && isOpened;
     }
-
-    // REX::INFO(std::format("Event [{0}] is opening: {1}.", menu, isOpened));
 }
