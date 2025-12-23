@@ -25,7 +25,14 @@ void DetourSteamAPI_RunCallbacks()
         return;
     }
 
-    fpSteamAPI_RunCallbacks();
+    __try
+    {
+        fpSteamAPI_RunCallbacks();
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        releaseMemory();
+    }
 }
 
 using ShowFloatingGamepadTextInputFn = bool(__thiscall*)(ISteamUtils* thisptr, EFloatingGamepadTextInputMode eKeyboardMode, int nTextFieldXPosition, int nTextFieldYPosition, int nTextFieldWidth, int nTextFieldHeight);
@@ -189,7 +196,7 @@ void SteamWorkaround::SetMenu(std::string menu, bool isOpened)
         isLooksMenuOpen = isLooksMenuOpen || isOpened;
     }
 
-    if (menu == "CursorMenu")
+    if (menu == "MainMenu")
     {
         isMainMenuOpen = isMainMenuOpen && isOpened;
     }
